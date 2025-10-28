@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZenithFit - Your Ultimate Fitness Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'brand-primary': '#00A8FF',
+              'brand-secondary': '#00E0C7',
+              // Dark Theme
+              'dark-bg': '#121212',
+              'dark-card': '#1E1E1E',
+              'dark-border': '#2D2D2D',
+              'light-text': '#E0E0E0',
+              'medium-text': '#A0A0A0',
+              // Light Theme
+              'light-bg': '#F7F9FC',
+              'light-card': '#FFFFFF',
+              'light-border': '#E0E7FF',
+              'dark-text': '#111827',
+              'medium-text-light': '#6B7280',
+            },
+          },
+        },
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+    "vitest": "https://aistudiocdn.com/vitest@^4.0.4",
+    "@testing-library/react": "https://aistudiocdn.com/@testing-library/react@^16.3.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-light-bg dark:bg-dark-bg">
+    <div id="root"></div>
+  </body>
+</html>
