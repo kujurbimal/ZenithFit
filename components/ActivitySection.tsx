@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { MOCK_ACTIVITIES, MOCK_LEADERBOARD } from '../constants';
-import { Activity, LeaderboardUser } from '../types';
+import { Activity, LeaderboardUser, LatLng } from '../types';
 import { LogActivityModal } from './LogActivityModal';
 import { MapModal } from './MapModal';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { ShareIcon } from './icons/ShareIcon';
 import { CheckIcon } from './icons/CheckIcon';
+import { LiveTrackingView } from './LiveTrackingView';
 
 const ThumbsUpIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -21,9 +22,17 @@ const ChatIcon = () => (
 
 const PlusIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
     </svg>
 );
+
+const RecordIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+);
+
 
 const LeaderboardItem: React.FC<{ user: LeaderboardUser }> = ({ user }) => (
     <li className={`flex items-center p-3 rounded-lg ${user.name === 'You' ? 'bg-brand-primary/20' : ''}`}>
@@ -34,10 +43,37 @@ const LeaderboardItem: React.FC<{ user: LeaderboardUser }> = ({ user }) => (
     </li>
 );
 
+const ActionSelectionModal: React.FC<{ onSelect: (action: 'record_run' | 'record_ride' | 'manual') => void, onClose: () => void }> = ({ onSelect, onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-end justify-center z-50 p-4" onClick={onClose}>
+        <div className="bg-light-card dark:bg-dark-card rounded-2xl p-4 w-full max-w-md shadow-2xl border border-light-border dark:border-dark-border transform transition-all duration-300 translate-y-4 animate-slide-in" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-center mb-4 text-dark-text dark:text-light-text">Start New Activity</h3>
+            <div className="space-y-3">
+                 <button onClick={() => onSelect('record_run')} className="w-full flex items-center justify-center space-x-3 text-lg bg-brand-primary/10 text-brand-primary font-bold py-4 rounded-lg hover:bg-brand-primary/20 transition-colors">
+                    <RecordIcon />
+                    <span>Record a Run</span>
+                </button>
+                 <button onClick={() => onSelect('record_ride')} className="w-full flex items-center justify-center space-x-3 text-lg bg-brand-primary/10 text-brand-primary font-bold py-4 rounded-lg hover:bg-brand-primary/20 transition-colors">
+                    <RecordIcon />
+                    <span>Record a Ride</span>
+                </button>
+                <button onClick={() => onSelect('manual')} className="w-full bg-light-bg dark:bg-dark-bg font-bold py-4 rounded-lg hover:bg-light-border dark:hover:bg-dark-border transition-colors text-dark-text dark:text-light-text">
+                    Log Manually
+                </button>
+            </div>
+        </div>
+        <style>{`.animate-slide-in { animation: slideIn 0.2s ease-out forwards; } @keyframes slideIn { from { transform: translateY(1rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
+    </div>
+);
+
+
 export const ActivitySection: React.FC = () => {
     const [activities, setActivities] = useState<Activity[]>(MOCK_ACTIVITIES);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+    const [showActionSelection, setShowActionSelection] = useState(false);
+    const [trackingSessionType, setTrackingSessionType] = useState<'Run' | 'Ride' | null>(null);
+    const [trackedActivityData, setTrackedActivityData] = useState< (Omit<Activity, 'id' | 'userName' | 'userAvatar' | 'date' | 'kudos' | 'comments' | 'pace'>) | null>(null);
+    const [kudoedActivities, setKudoedActivities] = useState<Set<string>>(new Set());
 
 
     const calculatePace = (type: 'Run' | 'Ride', distance: number, duration: string): string => {
@@ -76,10 +112,54 @@ export const ActivitySection: React.FC = () => {
             pace: calculatePace(activityData.type, activityData.distance, activityData.duration),
         };
         setActivities(prev => [newActivity, ...prev]);
-        setIsModalOpen(false);
+        setIsLogModalOpen(false);
+        setTrackedActivityData(null);
     };
 
-    const ActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => {
+    const handleActionSelect = (action: 'record_run' | 'record_ride' | 'manual') => {
+        setShowActionSelection(false);
+        if (action === 'record_run') {
+            setTrackingSessionType('Run');
+        } else if (action === 'record_ride') {
+            setTrackingSessionType('Ride');
+        } else if (action === 'manual') {
+            setTrackedActivityData(null); // Ensure no old data is present
+            setIsLogModalOpen(true);
+        }
+    };
+    
+    const handleFinishTracking = (data: { type: 'Run' | 'Ride'; distance: number; duration: string; route: LatLng[] }) => {
+        setTrackingSessionType(null);
+        setTrackedActivityData({ ...data, mapImage: '' });
+        setIsLogModalOpen(true);
+    };
+
+    const handleGiveKudos = (activityId: string) => {
+        if (kudoedActivities.has(activityId)) {
+            return; // Already given kudos, do nothing.
+        }
+
+        // Optimistically update the UI
+        setActivities(prevActivities =>
+            prevActivities.map(activity =>
+                activity.id === activityId
+                    ? { ...activity, kudos: activity.kudos + 1 }
+                    : activity
+            )
+        );
+
+        setKudoedActivities(prevKudoed => {
+            const newKudoed = new Set(prevKudoed);
+            newKudoed.add(activityId);
+            return newKudoed;
+        });
+    };
+
+    const ActivityCard: React.FC<{ 
+        activity: Activity;
+        onGiveKudos: (id: string) => void;
+        hasBeenKudoed: boolean;
+    }> = ({ activity, onGiveKudos, hasBeenKudoed }) => {
         const [isExpanded, setIsExpanded] = useState(false);
         const [justCopied, setJustCopied] = useState(false);
         const icon = activity.type === 'Run' ? '🏃‍♂️' : '🚴‍♀️';
@@ -167,10 +247,19 @@ export const ActivitySection: React.FC = () => {
                     )}
                     <div className="p-4 flex items-center justify-between text-medium-text-light dark:text-medium-text">
                         <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-1">
+                            <button
+                                onClick={() => onGiveKudos(activity.id)}
+                                disabled={hasBeenKudoed}
+                                className={`flex items-center space-x-1 p-1 rounded-md transition-colors duration-200 ${
+                                    hasBeenKudoed
+                                        ? 'text-brand-primary font-bold'
+                                        : 'text-medium-text-light dark:text-medium-text hover:text-brand-primary/80 hover:bg-brand-primary/10'
+                                } disabled:cursor-default disabled:opacity-80`}
+                                aria-label={hasBeenKudoed ? 'You have given kudos' : 'Give kudos'}
+                            >
                                 <ThumbsUpIcon />
                                 <span>{activity.kudos}</span>
-                            </div>
+                            </button>
                             <div className="flex items-center space-x-1">
                                 <ChatIcon />
                                 <span>{activity.comments}</span>
@@ -205,14 +294,7 @@ export const ActivitySection: React.FC = () => {
         <>
             <div className="p-4 space-y-6">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Activity Feed</h2>
-                     <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-brand-primary text-white rounded-full p-3 shadow-lg hover:bg-opacity-90 transition-transform duration-200 hover:scale-110"
-                        aria-label="Log new workout"
-                    >
-                        <PlusIcon />
-                    </button>
+                    <h2 className="text-2xl font-bold text-dark-text dark:text-light-text">Activity Feed</h2>
                 </div>
                 
                 <div className="bg-light-card dark:bg-dark-card border border-light-border dark:border-dark-border rounded-xl p-4">
@@ -223,11 +305,32 @@ export const ActivitySection: React.FC = () => {
                 </div>
                 
                 <div className="space-y-6">
-                    {activities.map(activity => <ActivityCard key={activity.id} activity={activity} />)}
+                    {activities.map(activity => <ActivityCard 
+                        key={activity.id} 
+                        activity={activity}
+                        onGiveKudos={handleGiveKudos}
+                        hasBeenKudoed={kudoedActivities.has(activity.id)}
+                    />)}
                 </div>
             </div>
-            {isModalOpen && <LogActivityModal onClose={() => setIsModalOpen(false)} onAddActivity={handleAddActivity} />}
+
+            <div className="fixed bottom-24 right-4 z-40">
+                <button
+                    onClick={() => setShowActionSelection(true)}
+                    className="bg-brand-primary text-white rounded-full p-4 shadow-lg hover:bg-opacity-90 transition-transform duration-200 hover:scale-110"
+                    aria-label="Start or log activity"
+                >
+                    <PlusIcon />
+                </button>
+            </div>
+
+            {showActionSelection && <ActionSelectionModal onSelect={handleActionSelect} onClose={() => setShowActionSelection(false)} />}
+            
+            {isLogModalOpen && <LogActivityModal onClose={() => { setIsLogModalOpen(false); setTrackedActivityData(null); }} onAddActivity={handleAddActivity} initialData={trackedActivityData} />}
+            
             {selectedActivity && <MapModal activity={selectedActivity} onClose={() => setSelectedActivity(null)} />}
+            
+            {trackingSessionType && <LiveTrackingView activityType={trackingSessionType} onFinish={handleFinishTracking} onCancel={() => setTrackingSessionType(null)} />}
         </>
     );
 };

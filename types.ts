@@ -14,6 +14,11 @@ export interface FoodItem {
   meal: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
 }
 
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export interface Activity {
   id: string;
   type: 'Run' | 'Ride';
@@ -26,6 +31,7 @@ export interface Activity {
   mapImage: string;
   kudos: number;
   comments: number;
+  route?: LatLng[];
 }
 
 export interface LeaderboardUser {

@@ -1,5 +1,5 @@
 {
-  "name": "Copy of ZenithFit",
+  "name": "GoFit",
   "description": "A comprehensive fitness app that combines diet and weight loss tracking inspired by MyFitnessPal, running and cycling features modeled after Strava, and a general wellness hub similar to Apple Health. It leverages AI for personalized recommendations.",
   "requestFramePermissions": [
     "geolocation"
